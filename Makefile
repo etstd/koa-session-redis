@@ -1,7 +1,7 @@
 test:
 	@NODE_ENV=test ./node_modules/.bin/mocha \
+		--exit \
 		--require should \
-		--harmony-generators \
 		--reporter spec
 
 clean:
