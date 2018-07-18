@@ -19,10 +19,10 @@ Set your redis connection configuration in options.store
   example (using redis without specific configuration)
 
 ```js
-var session = require('koa-session-redis');
+const session = require('koa-session-redis');
 
-var koa = require('koa');
-var app = koa();
+const Koa = require('koa');
+const app = new Koa();
 
 app.keys = ['some secret hurr'];
 app.use(session({
@@ -34,10 +34,10 @@ app.use(session({
   },
 ));
 
-app.use(function *(){
-  var n = this.session.views || 0;
-  this.session.views = ++n;
-  this.body = n + ' views';
+app.use(async function( ctx ){
+  let n = ctx.session.views || 0;
+  ctx.session.views = ++n;
+  ctx.body = n + ' views';
 })
 
 app.listen(3000);
