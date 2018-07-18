@@ -2,11 +2,11 @@
 /**
  * Module dependencies.
  */
+const promisify = require('util').promisify,
 
-var debug = require('debug')('koa-session-redis'),
-    uid = require('uid2'),
-    thunkify = require('thunkify'),
-    redis = require('redis');
+      debug     = require('debug')('koa-session-redis'),
+      uid       = require('uid2'),
+      redis     = require('redis');
 
 /**
  * Initialize session middleware with `opts`:
@@ -18,10 +18,9 @@ var debug = require('debug')('koa-session-redis'),
  * @api public
  */
 
-module.exports = function (opts) {
-  var key, client, redisOption, cookieOption;
+module.exports = function ( opts = { } ) {
+  let key, client, redisOption, cookieOption;
 
-  opts = opts || {};
   // key
   key = opts.key || 'koa:sess';
   debug('key config is: %s', key);
@@ -41,7 +40,7 @@ module.exports = function (opts) {
   debug('cookie config overwrite: %s', (cookieOption.overwrite === false) ? false : (cookieOption.overwrite = true));
   debug('cookie config httpOnly: %s', (cookieOption.httpOnly === false) ? false : (cookieOption.httpOnly = true));
   debug('cookie config signed: %s', (cookieOption.signed === false) ? false : (cookieOption.signed = true));
-  debug('cookie config maxage: %s', (typeof cookieOption.maxage !== 'undefined') ? cookieOption.maxage : (cookieOption.maxage = redisOption.ttl * 1000 || null));
+  debug('cookie config maxAge: %s', (typeof cookieOption.maxAge !== 'undefined') ? cookieOption.maxAge : (cookieOption.maxAge = redisOption.ttl * 1000 || null));
 
   //redis client for session
   client = redis.createClient(
@@ -54,9 +53,9 @@ module.exports = function (opts) {
     debug('redis changed to db %d', redisOption.db);
   });
 
-  client.get = thunkify(client.get);
-  client.set = thunkify(client.set);
-  client.del = thunkify(client.del);
+  client.get = promisify(client.get);
+  client.set = promisify(client.set);
+  client.del = promisify(client.del);
   client.ttl = redisOption.ttl ? function expire(key) { client.expire(key, redisOption.ttl); }: function () {};
 
   client.on('connect', function () {
@@ -83,77 +82,91 @@ module.exports = function (opts) {
     debug('redis connection ended');
   });
 
-  return function *(next) {
-    var sess, sid, json;
-
-    // to pass to Session()
-    this.cookieOption = cookieOption;
-    this.sessionKey = key;
-    this.sessionId = null;
-
-    sid = this.cookies.get(key, cookieOption);
-
-    if (sid) {
-      debug('sid %s', sid);
-      try {
-        json = yield client.get(sid);
-      }catch (e) {
-        debug('encounter error %s', e);
-        json = null;
-      }
-    }
-
-    if (json) {
-      this.sessionId = sid;
-      debug('parsing %s', json);
-      try {
-        sess = new Session(this, JSON.parse(json));
-      } catch (err) {
-        // backwards compatibility:
-        // create a new session if parsing fails.
-        // `JSON.parse(string)` will crash.
-        if (!(err instanceof SyntaxError)) throw err;
-        sess = new Session(this);
-      }
-    } else {
-      sid = this.sessionId = uid(24);
-      debug('new session');
-      sess = new Session(this);
-    }
-
-    this.__defineGetter__('session', function () {
-      // already retrieved
-      if (sess) return sess;
-      // unset
-      if (false === sess) return null;
-    });
-
-    this.__defineSetter__('session', function (val) {
-      if (null === val) return sess = false;
-      if ('object' === typeof val) return sess = new Session(this, val);
-      throw new Error('this.session can only be set as null or an object.');
-    });
-
+  return async function ( ctx, next ) {
     try {
-      yield *next;
-    } catch (err) {
-      throw err;
-    } finally {
-      if (undefined === sess) {
-        // not accessed
-      } else if (false === sess) {
-        // remove
-        this.cookies.set(key, '', cookieOption);
-        yield client.del(sid);
-      } else if (!json && !sess.length) {
-        // do nothing if new and not populated
-      } else if (sess.changed(json)) {
-        // save
-        json = sess.save();
-        yield client.set(sid, json);
-        client.ttl(sid);
+      let sess = null, sid  = null, json = null;
+
+      // to pass to Session()
+      ctx.cookieOption = cookieOption;
+      ctx.sessionKey = key;
+      ctx.sessionId = null;
+
+      sid = ctx.cookies.get(key, cookieOption);
+
+      if (sid) {
+        debug('sid %s', sid);
+        try {
+          json = await client.get(sid);
+        }
+        catch (e) {
+          debug('encounter error %s', e);
+          json = null;
+        }
       }
+
+      if (json) {
+        ctx.sessionId = sid;
+        debug('parsing %s', json);
+        try {
+          sess = new Session(ctx, JSON.parse(json));
+        } 
+        catch (err) {
+          // backwards compatibility:
+          // create a new session if parsing fails.
+          // `JSON.parse(string)` will crash.
+          if (!(err instanceof SyntaxError)) throw err;
+          sess = new Session(ctx);
+        }
+      } 
+      else {
+        sid = ctx.sessionId = uid(24);
+        debug('new session');
+        sess = new Session(ctx);
+      }
+
+      ctx.__defineGetter__('session', function () {
+        // already retrieved
+        if (sess) return sess;
+        // unset
+        if (false === sess) return null;
+      });
+
+
+      ctx.__defineSetter__('session', function (val) {
+        if (null === val) return sess = false;
+        if ('object' === typeof val) return sess = new Session(this, val);
+        throw new Error('ctx.session can only be set as null or an object.');
+      });
+
+      try {
+        await next();
+      } 
+      catch (err) {
+        throw err;
+      } 
+      finally {
+        if (undefined === sess) {
+          // not accessed
+        } 
+        else if (false === sess) {
+          // remove
+          ctx.cookies.set(key, '', cookieOption);
+          await client.del(sid);
+        } 
+        else if (!json && !sess.length) {
+          // do nothing if new and not populated
+        } 
+        else if (sess.changed(json)) {
+          // save
+          json = sess.save();
+          await client.set(sid, json);
+          client.ttl(sid);
+        }
+      };
     }
+    catch ( error ) {
+      throw error;
+    };
   };
 };
 
@@ -178,8 +191,7 @@ function Session(ctx, obj) {
  * @api public
  */
 
-Session.prototype.inspect =
-  Session.prototype.toJSON = function () {
+Session.prototype.inspect = Session.prototype.toJSON = function () {
   var self = this;
   var obj = {};
 
