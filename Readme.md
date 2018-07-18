@@ -75,7 +75,7 @@ console.log('listening on port 3000');
   To destroy a session simply set it to `null`:
 
 ```js
-this.session = null;
+ctx.session = null;
 ```
 
 ## License
