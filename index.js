@@ -2,7 +2,7 @@
 /**
  * Module dependencies.
  */
-const promisify = require('util').promisify,
+const util = require('util'),
 
       debug     = require('debug')('koa-session-redis'),
       uid       = require('uid2'),
@@ -53,9 +53,9 @@ module.exports = function ( opts = { } ) {
     debug('redis changed to db %d', redisOption.db);
   });
 
-  client.get = promisify(client.get);
-  client.set = promisify(client.set);
-  client.del = promisify(client.del);
+  client.get = util.promisify(client.get);
+  client.set = util.promisify(client.set);
+  client.del = util.promisify(client.del);
   client.ttl = redisOption.ttl ? function expire(key) { client.expire(key, redisOption.ttl); }: function () {};
 
   client.on('connect', function () {
@@ -191,7 +191,7 @@ function Session(ctx, obj) {
  * @api public
  */
 
-Session.prototype.inspect = Session.prototype.toJSON = function () {
+Session.prototype.toJSON = function() {
   var self = this;
   var obj = {};
 
@@ -202,6 +202,14 @@ Session.prototype.inspect = Session.prototype.toJSON = function () {
   });
 
   return obj;
+};
+
+// check: DEP0079: Custom inspection function on Objects via .inspect()
+if( util.inspect.custom ){
+  Session.prototype[util.inspect.custom] = Session.prototype.toJSON
+}
+else{
+  Session.prototype.inspect = Session.prototype.toJSON
 };
 
 /**
