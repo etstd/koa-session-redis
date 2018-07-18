@@ -45,7 +45,6 @@
     "lastsemic": false,
     "iterator": false,
     "funcscope": false,
-    "esnext": true,
     "newcap": false,
     "noempty": false,
     "nonew": false,
@@ -60,5 +59,7 @@
     "maxparams": 5,
     "maxdepth": 5,
     "maxstatements": 30,
-    "maxcomplexity": 10
+    "maxcomplexity": 10,
+    "esversion": 6,
+    "mocha": true
 }
