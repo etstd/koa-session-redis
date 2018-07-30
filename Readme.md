@@ -9,7 +9,7 @@
 ## Installation
 
 ```js
-$ npm install koa-session-redis
+$ npm install etstd/koa-session-redis#next
 ```
 
 ## Notice
