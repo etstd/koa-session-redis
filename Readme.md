@@ -4,11 +4,9 @@
 
  Based on [koa-session](https://github.com/koajs/session)
 
- [![Build Status](https://travis-ci.org/Chilledheart/koa-session-redis.png?branch=master)](https://travis-ci.org/Chilledheart/koa-session-redis)
-
 ## Installation
 
-```js
+```sh
 $ npm install etstd/koa-session-redis#next
 ```
 
